@@ -127,6 +127,7 @@ void Cache::HandleRequest(uint64_t addr, int bytes, int read,
       // while the 0|1 for normal ones.
       PrefetchAlgorithm();
     }
+    delete [] buffer;
   }
   // Fetch from the lower layer
 

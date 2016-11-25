@@ -16,6 +16,7 @@ enum Mode
 };
 
 void ShowUsage();
+void testA(fstream & fin);
 
 int main(int argc, char ** argv) {
 	int cacheSize, blockSize, lineSize, setAss;
@@ -23,9 +24,6 @@ int main(int argc, char ** argv) {
 	bool Writeback, Writeallocate;
 
 	Mode mode;
-
-	string op;
-	LLU address;
 
 	// parse the options
 	// if there is no arguments, print the usage message and return
@@ -59,8 +57,17 @@ int main(int argc, char ** argv) {
 		exit(1);
 	}
 
-	while (exeFile >> op >> address) {
-		cout << op << " " << address << endl;
+	switch (mode) {
+		case A:
+			testA(exeFile);
+			break;
+		case B:
+			break;
+		case S:
+			break;
+		default:
+			cout << "WRONG!!!" << endl;
+			break;
 	}
 
 	exeFile.close();
@@ -83,4 +90,50 @@ void ShowUsage() {
 	printf("\t<WriteUpdatePolicy>\t0 for write back and 1 for write through\n");
 
 	printf("\n");
+}
+
+void testA(fstream & fin) {
+	string op;
+	LLU address;
+
+	char * buffer = new char[2];
+	int hit;
+	int cycle;
+	int total = 0;
+
+	Cache * L1 = new Cache();
+	Memory * mem = new Memory();
+
+	CacheConfig l1conf;
+	l1conf.size = 32768;
+	l1conf.associativity = 8;
+	l1conf.set_num = 32;
+	l1conf.write_through = WRITE_BACK;
+	l1conf.write_allocate = WRITE_ALLOCATE;
+
+	StorageLatency sl1;
+	sl1.hit_latency = 3;
+	sl1.bus_latency = 10;
+
+	L1 -> SetLatency(sl1);
+	L1 -> SetConfig(l1conf);
+	L1 -> SetLower(mem);
+	mem -> SetLatency(sl1);
+
+	while (fin >> op >> address) {
+		// cout << op << " " << address << endl;
+		if (op[0] == 'w') {
+			L1 -> HandleRequest(address, 1, WRITE, buffer, hit, cycle);
+			cout << hit << " " << cycle << endl;
+			total += cycle;
+		} else {
+			L1 -> HandleRequest(address, 1, READ, buffer, hit, cycle);
+			cout << hit << " " << cycle << endl;
+			total += cycle;
+		}
+	}
+	cout << "Total : " << total << endl;
+	delete [] buffer;
+	delete L1;
+	delete mem;
 }
