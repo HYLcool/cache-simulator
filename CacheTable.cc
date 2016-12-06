@@ -14,7 +14,7 @@ CacheTable::CacheTable(int set_num_,int line_num_,int offset_num_){
 	}
 	int lines=set_num_*line_num_;
 	valid=new bool[lines];  //the valid
-	tag=new int[lines];  //new tag
+	tag=new long long int[lines];  //new tag
 	dirty = new bool[lines];
 	lru = new int[lines];
 	for(int i=0;i<=lines-1;i++){         //initial to all zero
@@ -26,9 +26,11 @@ CacheTable::CacheTable(int set_num_,int line_num_,int offset_num_){
 	
 }
 CacheTable::~CacheTable(){
-	delete data;
-	delete valid;
-	delete tag;
+	delete []data;
+	delete []valid;
+	delete []tag;
+	delete []dirty;
+	delete []lru;
 }
 bool CacheTable::getValid(int set,int line){
 	if(set<0||set>=set_num){
@@ -44,7 +46,7 @@ bool CacheTable::getValid(int set,int line){
 
 
 }
-int CacheTable::getTag(int set,int line){
+long long int CacheTable::getTag(int set,int line){
 	if(set<0||set>=set_num){
 		printf("set num over when get tag\n");
 		return -1;
@@ -123,10 +125,8 @@ bool CacheTable::setValid(int set,int line,bool value){
 	int num=set*line_num+line;
 	valid[num]=value;
 	return 1;
-
-
 }
-bool CacheTable::setTag(int set,int line,int value){
+bool CacheTable::setTag(int set,int line,long long int value){
 	if(set<0||set>=set_num){
 		printf("set num over when set tag\n");
 		return 0;

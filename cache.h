@@ -7,6 +7,7 @@
 
 #include "storage.h"
 #include "CacheTable.h"
+#include "def.h"
 
 typedef struct CacheConfig_ {
   int size;
@@ -18,7 +19,7 @@ typedef struct CacheConfig_ {
 
 class Cache: public Storage {
  public:
-  Cache() {}
+  Cache() {lrucount_ = 0;}
   ~Cache() {delete cachetable;}
 
   // Sets & Gets
@@ -35,8 +36,8 @@ class Cache: public Storage {
   // Partitioning
   void PartitionAlgorithm();
   // Replacement
-  int ReplaceDecision(int tt, unsigned int tsn,int & hitline, bool& p);
-  void ReplaceAlgorithm(int &index);
+  int ReplaceDecision(LLU tt, unsigned int tsn,int & hitline, bool& p);
+  void ReplaceAlgorithm(int set, bool isfull, int &index);
   // Prefetching
   int PrefetchDecision();
   void PrefetchAlgorithm();
@@ -44,6 +45,7 @@ class Cache: public Storage {
   CacheConfig config_;
   Storage *lower_;
   CacheTable *cachetable;
+  int lrucount_;
   DISALLOW_COPY_AND_ASSIGN(Cache);
 };
 
