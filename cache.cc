@@ -116,7 +116,7 @@ void Cache::HandleRequest(uint64_t addr, int bytes, int read,
     		content[i] = cachetable -> getData(setnum, index, offset + i);
     	}
     	//printf("not hit!!\n");
-    	cycle = latency_.bus_latency + lower_cycle;
+    	cycle = latency_.bus_latency + lower_cycle + latency_.hit_latency;
 	}
 	else if(read == WRITE)
 	{		
@@ -145,16 +145,18 @@ void Cache::HandleRequest(uint64_t addr, int bytes, int read,
 				}
 			}
 			cachetable -> setLRU(setnum, index, lrucount_);
+			cycle = 0;
 		}
 		else 
 		{
 			stats_.fetch_num += 1;
-			lower_->HandleRequest(addr, bytes, read, content, lower_hit, lower_cycle);
+			lower_ -> HandleRequest(addr, bytes, read, content, lower_hit, lower_cycle);
+			cycle = lower_cycle;
 		}
-		cycle = latency_.bus_latency;
+		cycle += latency_.bus_latency + latency_.hit_latency;
 	}
     hit = 0;
-    stats_.access_cycle += latency_.bus_latency;
+    stats_.access_cycle += latency_.bus_latency + latency_.hit_latency;
     
 
     // Decide on whether a prefetch should take place.
