@@ -7,7 +7,6 @@
 #include <string.h>
 #include <cstdarg>
 
-#include "def.h"
 #include "cache.h"
 #include "memory.h"
 
@@ -15,7 +14,7 @@ using namespace std;
 
 enum Mode
 {
-	A, B, C, D32
+	A, B, C, D32, T32
 };
 
 struct Level
@@ -26,6 +25,8 @@ struct Level
 	int hit_;
 };
 
+int strategy;
+
 int level;
 Level linfo[3];
 
@@ -34,6 +35,7 @@ void testA(fstream & fin);
 void testB(fstream & fin);
 void testC(fstream & fin ,int back,int allocate);
 void test321(char * filename);
+void test322(char * filename);
 
 int main(int argc, char ** argv) {
 	int cacheSize, blockSize, lineSize, setAss;
@@ -78,6 +80,8 @@ int main(int argc, char ** argv) {
 				linfo[j].hit_ = atoi(*(argv + i));
 				i += 1;
 			}
+		} else if (! strcmp(*(argv + i), "-op")) {
+			mode = T32;
 		} else { // unknown argument
 			printf("Unknown argument : %s\n", *(argv + i));
 			exit(1);
@@ -105,6 +109,9 @@ int main(int argc, char ** argv) {
 			break;
 		case D32:
 			test321(exeFilename);
+			break;
+		case T32:
+			test322(exeFilename);
 			break;
 		default:
 			cout << "WRONG!!!" << endl;
@@ -395,10 +402,93 @@ void test321(char * filename) {
 	}
 	printf("%lf%%,%llu\n", tmiss * 100.0 / (tmiss + thit + 0.0), total);
 
+	delete [] op;
 	delete [] buffer;
 	delete mem;
 	for (int i = 0; i < level; i++) {
 		delete cachel[i];
 	}
 	fclose(fd);
+}
+
+void test322(char * filename) {
+	// open the file
+	FILE * fd = fopen(filename, "r");
+	if (fd < 0) {
+		printf("Unable to open file : %s\n", filename);
+		exit(1);
+	}
+
+	printf("Please choose the replacement strategy: \n");
+	scanf("%d", &strategy);
+
+	char *op = new char[3];
+	LLU address;
+	char * buffer = new char[2];
+
+	int hit, cycle;
+	LLU thit = 0, tmiss = 0, total = 0;
+	const int back = WRITE_BACK;
+	const int allocate = WRITE_ALLOCATE;
+
+	Memory * mem = new Memory();
+	StorageLatency mems;
+	mems.hit_latency = 100;
+	mems.bus_latency = 0;
+	mem -> SetLatency(mems);
+
+	Cache * l1 = new Cache();
+	Cache * l2 = new Cache();
+
+	CacheConfig config1, config2;
+	config1.size = 32768;
+	config1.associativity = 8;
+	config1.set_num = 64;
+	config1.write_through = back;
+	config1.write_allocate = allocate;
+
+	config2.size = 262144;
+	config2.associativity = 8;
+	config2.set_num = 512;
+	config2.write_through = back;
+	config2.write_allocate = allocate;
+
+	StorageLatency cachelatency1, cachelatency2;
+	cachelatency1.hit_latency = 1;
+	cachelatency1.bus_latency = 0;
+
+	cachelatency2.hit_latency = 2;
+	cachelatency2.bus_latency = 6;
+
+	l1 -> SetLatency(cachelatency1);
+	l1 -> SetConfig(config1);
+
+	l2 -> SetLatency(cachelatency2);
+	l2 -> SetConfig(config2);
+
+	l1 -> SetLower(l2);
+	l2 -> SetLower(mem);
+
+	int times = 0;
+	while (fscanf(fd, "%s %llx", op, &address) == 2) {
+		if (op[0] == 'w') {
+			l1 -> HandleRequest(address, 1, WRITE, buffer, hit, cycle);
+		} else if (op[0] == 'r') {
+			l1 -> HandleRequest(address, 1, READ, buffer, hit, cycle);
+		}
+		total += cycle;
+		thit += hit;
+		tmiss += (1 - hit);
+		times ++;
+	}
+
+	cout << "Miss rate : " << tmiss * 100.0 / (tmiss + thit) << "%" << endl;
+	cout << "Total latency : " << total << endl;
+
+	fclose(fd);
+	delete mem;
+	delete l1;
+	delete l2;
+	delete op;
+	delete buffer;
 }

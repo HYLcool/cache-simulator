@@ -1,5 +1,6 @@
 #include "cache.h"
-#include "def.h"
+
+extern int strategy;
 
 // Main access process
 // [in]  addr: access address
