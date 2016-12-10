@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iomanip>
 #include <string.h>
+#include <cstdarg>
 
 #include "def.h"
 #include "cache.h"
@@ -14,13 +15,25 @@ using namespace std;
 
 enum Mode
 {
-	A, B, C
+	A, B, C, D32
 };
+
+struct Level
+{
+	int capacity_;
+	int associativity_;
+	int set_;
+	int hit_;
+};
+
+int level;
+Level linfo[3];
 
 void ShowUsage();
 void testA(fstream & fin);
 void testB(fstream & fin);
 void testC(fstream & fin ,int back,int allocate);
+void test321(char * filename);
 
 int main(int argc, char ** argv) {
 	int cacheSize, blockSize, lineSize, setAss;
@@ -50,6 +63,21 @@ int main(int argc, char ** argv) {
 			i += 2;
 		} else if (! strcmp(*(argv + i), "-b")) { // test b
 			mode = B;
+		} else if (! strcmp(*(argv + i), "-32")) { // test 1 in lab 3.2
+			mode = D32;
+			i += 1;
+			level = atoi(*(argv + i));
+			i += 1;
+			for (int j = 0; j < level; j++) {
+				linfo[j].capacity_ = atoi(*(argv + i));
+				i += 1;
+				linfo[j].associativity_ = atoi(*(argv + i));
+				i += 1;
+				linfo[j].set_ = atoi(*(argv + i));
+				i += 1;
+				linfo[j].hit_ = atoi(*(argv + i));
+				i += 1;
+			}
 		} else { // unknown argument
 			printf("Unknown argument : %s\n", *(argv + i));
 			exit(1);
@@ -75,6 +103,9 @@ int main(int argc, char ** argv) {
 		case C:
 			testC(exeFile, back, allocate);
 			break;
+		case D32:
+			test321(exeFilename);
+			break;
 		default:
 			cout << "WRONG!!!" << endl;
 			break;
@@ -93,6 +124,8 @@ void ShowUsage() {
 	printf("\t-b\tfor the second test in test A\n");
 	printf("\t-c\tfor the third test in test A, there are 2 arguments here:\n");
 	printf("\t\t\t<back&through> <allocate>: 0 for back and 1 for through, 0 for no allocate and 1 for allocate\n");
+	printf("\t-32\tfor the test 1 in lab 3.2, there are plenty of arguments.\n");
+	printf("\t\t\t<level> [<capacity> <associativity> <set> <hit cycle>]: <level> is the level number of cache,\n\t\t\twith each level, we should tell the <capacity> ,the <associativity>, the <set> number and the <hit cycle>.\n");
 	printf("\t-u\tprint this usage message\n");
 	printf("\n");
 }
@@ -287,4 +320,85 @@ void testC(fstream & fin, int back, int allocate) {
 	delete [] buffer;
 	delete L1;
 	delete mem;
+}
+
+// for the first test in lab3.2
+void test321(char * filename) {
+	// open the file
+	FILE * fd = fopen(filename, "r");
+	if (fd < 0) {
+		printf("Unable to open file : %s\n", filename);
+		exit(1);
+	}
+
+	char *op = new char[3];
+	LLU address;
+	char * buffer = new char[2];
+
+	int hit, cycle;
+	LLU thit = 0, tmiss = 0, total = 0;
+	const int back = WRITE_BACK;
+	const int allocate = WRITE_ALLOCATE;
+
+	int bus[3] = {0, 3, 6};
+
+	Memory * mem = new Memory();
+	StorageLatency mems;
+	mems.hit_latency = 100;
+	mems.bus_latency = 0;
+	mem -> SetLatency(mems);
+
+	Cache * cachel[3];
+	for (int i = 0; i < level; i++) {
+		cachel[i] = new Cache();
+
+		CacheConfig config;
+		config.size = linfo[i].capacity_;
+		config.associativity = linfo[i].associativity_;
+		config.set_num = linfo[i].set_;
+		config.write_through = back;
+		config.write_allocate = allocate;
+
+		StorageLatency cachelatency;
+		cachelatency.hit_latency = linfo[i].hit_;
+		cachelatency.bus_latency = bus[i];
+
+		cachel[i] -> SetLatency(cachelatency);
+		cachel[i] -> SetConfig(config);
+
+		if (i > 0) {
+			cachel[i - 1] -> SetLower(cachel[i]);
+		}
+		if (i == level - 1) {
+			cachel[i] -> SetLower(mem);
+		}
+	}
+
+	int times = 0;
+	while (fscanf(fd, "%s %llx", op, &address) == 2) {
+		if (op[0] == 'w') {
+			cachel[0] -> HandleRequest(address, 1, WRITE, buffer, hit, cycle);
+		} else if (op[0] == 'r') {
+			cachel[0] -> HandleRequest(address, 1, READ, buffer, hit, cycle);
+		}
+		total += cycle;
+		thit += hit;
+		tmiss += (1 - hit);
+		times ++;
+	}
+
+	// cout << "Miss Rate: " << tmiss * 100.0 / (tmiss + thit + 0.0) << "%" << endl;
+	// cout << "Total cycles: " << total << endl;
+	// cout << "times: " << times << endl;
+	for (int i = 0; i < level; i++) {
+		printf("%d,%d,%d,", linfo[i].capacity_, linfo[i].associativity_, linfo[i].set_);
+	}
+	printf("%lf%%,%llu\n", tmiss * 100.0 / (tmiss + thit + 0.0), total);
+
+	delete [] buffer;
+	delete mem;
+	for (int i = 0; i < level; i++) {
+		delete cachel[i];
+	}
+	fclose(fd);
 }
