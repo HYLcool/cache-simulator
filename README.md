@@ -1,6 +1,6 @@
 # cache simulator
 
-- Cache模拟器 by 黄一伦，叶根，邢新宇
+- Cache模拟器 by HYL, YG, XXY
 
 # 用法:
 ```shell
